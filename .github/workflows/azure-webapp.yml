@@ -1,0 +1,71 @@
+name: Build and deploy VipaPDFMerge to Azure Web App
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  AZURE_WEBAPP_NAME: VipaPDFMerge
+  DOTNET_VERSION: '10.0.x'
+  PROJECT_PATH: './VipaPDFMerge.csproj'
+  PUBLISH_PATH: './publish'
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore "${{ env.PROJECT_PATH }}"
+
+      - name: Build
+        run: dotnet build "${{ env.PROJECT_PATH }}" --configuration Release --no-restore
+
+      - name: Publish
+        run: dotnet publish "${{ env.PROJECT_PATH }}" --configuration Release --no-build --output "${{ env.PUBLISH_PATH }}"
+
+      - name: Verify publish
+        shell: pwsh
+        run: |
+          Get-ChildItem "${{ env.PUBLISH_PATH }}"
+          if (-not (Test-Path "${{ env.PUBLISH_PATH }}/web.config")) {
+            throw "web.config was not generated"
+          }
+          if (-not (Test-Path "${{ env.PUBLISH_PATH }}/VipaPDFMerge.dll")) {
+            throw "VipaPDFMerge.dll was not generated"
+          }
+
+      - name: Upload publish artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vipapdfmerge-publish
+          path: ${{ env.PUBLISH_PATH }}
+          if-no-files-found: error
+
+  deploy:
+    runs-on: windows-latest
+    needs: build
+
+    steps:
+      - name: Download publish artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: vipapdfmerge-publish
+          path: ./publish
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: ./publish
