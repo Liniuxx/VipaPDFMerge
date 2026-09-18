@@ -34,15 +34,16 @@ jobs:
       - name: Publish
         run: dotnet publish "${{ env.PROJECT_PATH }}" --configuration Release --no-build --output "${{ env.PUBLISH_PATH }}"
 
-      - name: Verify publish
+      - name: Show publish contents
         shell: pwsh
         run: |
-          Get-ChildItem "${{ env.PUBLISH_PATH }}"
+          Write-Host "Publish folder:"
+          Get-ChildItem "${{ env.PUBLISH_PATH }}" | Format-Table Name, Length
           if (-not (Test-Path "${{ env.PUBLISH_PATH }}/web.config")) {
-            throw "web.config was not generated"
+            throw "web.config was not generated."
           }
           if (-not (Test-Path "${{ env.PUBLISH_PATH }}/VipaPDFMerge.dll")) {
-            throw "VipaPDFMerge.dll was not generated"
+            throw "VipaPDFMerge.dll was not generated."
           }
 
       - name: Upload publish artifact
@@ -55,6 +56,8 @@ jobs:
   deploy:
     runs-on: windows-latest
     needs: build
+    permissions:
+      contents: read
 
     steps:
       - name: Download publish artifact
