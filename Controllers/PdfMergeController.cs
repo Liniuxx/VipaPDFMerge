@@ -77,7 +77,20 @@ public sealed class PdfMergeController : ControllerBase
             if (!folderAbsolutePath.StartsWith(sitePath + "/", StringComparison.OrdinalIgnoreCase))
                 throw new ArgumentException("FolderPath must be inside OneDriveUrl.");
 
+            // FolderPath is a SharePoint web URL and normally contains the
+            // document library segment "Documents". The Graph /drive endpoint
+            // already points at that library, so root:/ paths must be relative
+            // to the drive root and must NOT contain "Documents" again.
             var drivePath = folderAbsolutePath[(sitePath.Length + 1)..].Trim('/');
+
+            if (drivePath.Equals("Documents", StringComparison.OrdinalIgnoreCase))
+            {
+                drivePath = string.Empty;
+            }
+            else if (drivePath.StartsWith("Documents/", StringComparison.OrdinalIgnoreCase))
+            {
+                drivePath = drivePath["Documents/".Length..];
+            }
 
             var location = await _oneDrive.ResolveLocationAsync(
                 oneDriveUri.Host,
@@ -169,6 +182,7 @@ public sealed class PdfMergeController : ControllerBase
             .Split('/', StringSplitOptions.RemoveEmptyEntries)
             .Select(Uri.EscapeDataString));
 
-        return $"{baseUrl}/{escaped}";
+        // oneDriveUrl points at the personal site root; folderPath is drive-relative.
+        return $"{baseUrl}/Documents/{escaped}";
     }
 }
